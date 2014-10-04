@@ -1,0 +1,37 @@
+# WayForward Engine assets extractor
+# Version 0.1 by artlavrov
+#
+# Unpack files to to "global.pak_extract":
+# quickbms -o -d wf_unpak.bms global.pak 
+#
+# Reimport files from "global.pak_extract" back to global.pak:
+# quickbms -o -d -r -w wf_unpak.bms global.pak
+#
+# Note QuickBMS reimports only files of the same or smaller size
+# this is the built-in limitation that cannot be avoided (yet?)
+
+endian little
+
+get FILES_OFFSET long
+get FILES_COUNT long
+
+for i = 0 < FILES_COUNT
+
+	# read file entry from the file list
+	getdstring FILE_SIG 16 # skip FILELINK_____END signature
+	get FILE_OFFSET long
+	get FILE_SIZE long
+	getct FILE_DIR string ':'
+	getct FILE_NAME string 0
+	padding 8
+
+	# print "%i%) ofs:%FILE_OFFSET% size: %FILE_SIZE% dir: %FILE_DIR% name: %FILE_NAME%"
+
+	# write file body
+	math FILE_OFFSET + FILES_OFFSET
+	math FILE_OFFSET + 64 # skip MANAGEDFILE_DATA BLOCK_USED_IN_ENGINE________________________END
+
+	string FNAME p= "%s/%s" FILE_DIR FILE_NAME
+	log FNAME FILE_OFFSET FILE_SIZE
+
+	next i
