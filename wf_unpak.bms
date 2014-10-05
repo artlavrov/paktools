@@ -1,5 +1,5 @@
 # WayForward Engine assets extractor
-# Version 0.1 by artlavrov
+# Version 0.2 by artlavrov
 #
 # Unpack files to to "global.pak_extract":
 # quickbms -o -d wf_unpak.bms global.pak 
@@ -21,17 +21,17 @@ for i = 0 < FILES_COUNT
 	getdstring FILE_SIG 16 # skip FILELINK_____END signature
 	get FILE_OFFSET long
 	get FILE_SIZE long
-	getct FILE_DIR string ':'
 	getct FILE_NAME string 0
 	padding 8
 
-	# print "%i%) ofs:%FILE_OFFSET% size: %FILE_SIZE% dir: %FILE_DIR% name: %FILE_NAME%"
-
-	# write file body
+	# calculate file offset
 	math FILE_OFFSET + FILES_OFFSET
 	math FILE_OFFSET + 64 # skip MANAGEDFILE_DATA BLOCK_USED_IN_ENGINE________________________END
 
-	string FNAME p= "%s/%s" FILE_DIR FILE_NAME
-	log FNAME FILE_OFFSET FILE_SIZE
+	# replace ':' to '/' in the file name
+	string FILE_NAME R= ":" "/"
+
+	# write file body
+	log FILE_NAME FILE_OFFSET FILE_SIZE
 
 	next i
