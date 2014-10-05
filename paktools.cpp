@@ -2,11 +2,23 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <direct.h>
 #include <malloc.h>
-#include <windows.h>			// FindFirstFile
+
+#ifdef _WIN32
+#include <direct.h>
+#include <windows.h>
+#define mkdir _mkdir
+#define getcwd _getcwd
+#define chdir _chdir
+#define stat _stat
+#define strdup _strdup
+#else
+#include <unistd.h>
+#include <dirent.h>
+#endif
+
 #include <sys/stat.h>
-#include <sys/types.h>			// for stat
+#include <sys/types.h>
 
 #define SIG_LINK "FILELINK_____END"
 #define SIG_DATA "MANAGEDFILE_DATA BLOCK_USED_IN_ENGINE________________________END"
@@ -24,7 +36,7 @@ typedef struct {
 int write_to_file(char *path, char *data, int size)
 {
 	char cwd[MAX_PATH];
-	_getcwd(cwd, sizeof(cwd));
+	getcwd(cwd, sizeof(cwd));
 
 	char *p = path;
 	while (1)
@@ -36,8 +48,13 @@ int write_to_file(char *path, char *data, int size)
 			break;
 		*c = 0;
 
-		_mkdir(p);
-		_chdir(p);
+#ifdef _WIN32
+		mkdir(p);
+#else
+		mkdir(p, S_IRWXU | S_IRWXG | S_IRWXO);
+#endif
+
+		chdir(p);
 		p = c + 1;
 	}
 
@@ -48,7 +65,7 @@ int write_to_file(char *path, char *data, int size)
 		fclose(fp);
 	}
 
-	_chdir(cwd);
+	chdir(cwd);
 
 	return 0;
 }
@@ -62,7 +79,7 @@ int unpack(const char *fname, const char *dir)
 	if (!fp)
 	{
 		fprintf(stderr, "Could not open `%s`, exiting...\n", fname);
-		return 1;
+		return -1;
 	}
 
 	fseek(fp, 0, SEEK_END);
@@ -80,7 +97,7 @@ int unpack(const char *fname, const char *dir)
 	else
 		strcpy(outdir, dir);
 
-	fprintf(stderr, "Loaded %s (%d bytes, %d files), extracting files to %s...\n", fname, size, files, outdir);
+	fprintf(stderr, "Loaded %s, extracting files to %s...\n", fname, outdir);
 
 	ofs = 8;
 
@@ -95,7 +112,7 @@ int unpack(const char *fname, const char *dir)
 		{
 			fprintf(stderr, "Not a pak file, exiting...");
 			fclose(fp);
-			return 1;
+			return -1;
 		}
 
 		fread(&at, 4, 1, fp);
@@ -106,7 +123,6 @@ int unpack(const char *fname, const char *dir)
 		int len = strlen(name);
 
 		at += loc + 64;			// 64 bytes for MANAGEDFILE_DATA BLOCK_USED_IN_ENGINE_________________________END
-		//printf("%d %d %s\n", at, size, name);
 
 		ofs += 16 + 4 * 2 + len + 1;
 		while (ofs % 8 != 0)
@@ -129,12 +145,14 @@ int unpack(const char *fname, const char *dir)
 		free(data);
 	}
 
-
 	fclose(fp);
+
+	fprintf(stderr, "Extracted %d files.\n", files);
 
 	return 0;
 }
 
+#ifdef _WIN32
 int list_dir(char *dir, file_t * files, int i)
 {
 	HANDLE hf;
@@ -149,13 +167,41 @@ int list_dir(char *dir, file_t * files, int i)
 			if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 				i = list_dir(path, files, i);
 			else
-				files[i++].name = _strdup(path);
+				files[i++].name = strdup(path);
 		}
 	}
 	FindClose(hf);
 	return i;
 }
+#else
+int list_dir(char *dir, file_t * files, int i)
+{
+	char path[MAX_PATH];
+	DIR *d;
+	struct dirent *dp;
+	struct stat st;
+	d = opendir(dir);
+	if (!d)
+		return -1;
 
+	while ((dp = readdir(d)) != NULL)
+	{
+		if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
+			continue;
+
+		sprintf(path, "%s/%s", dir, dp->d_name);
+		if (stat(path, &st) == -1)
+			return -1;
+		if ((st.st_mode & S_IFDIR) == S_IFDIR)
+			i = list_dir(path, files, i);
+		else
+			files[i++].name = strdup(path);
+	}
+
+	closedir(d);
+	return i;
+}
+#endif
 
 void fix_path(char *dest, char *dir, char *src)
 {
@@ -174,8 +220,6 @@ void fix_path(char *dest, char *dir, char *src)
 		*c = ':';
 
 	strcpy(dest, p);
-
-//	printf("Fixed path: `%s` + `%s` => `%s`\n", dir, src, dest);
 }
 
 
@@ -184,10 +228,10 @@ int pack(char *dir, char *fname)
 	file_t r[16384];
 	int files = list_dir(dir, r, 0);
 
-	if (files == 0)
+	if (files <= 0)
 	{
-		fprintf(stderr, "No files, exiting...");
-		return 1;
+		fprintf(stderr, "No files, exiting...\n");
+		return -1;
 	}
 
 	char path[MAX_PATH];
@@ -195,30 +239,31 @@ int pack(char *dir, char *fname)
 	if (!fname)
 	{
 		strcpy(path, dir);
+		char *c = strrchr(path, '/');
+		if (c)
+			*c = 0;
 		strcat(path, ".pak");
 	}
 	else
 		strcpy(path, fname);
 
-	fprintf(stderr, "Writing %s, %d file(s)...\n", path, files);
+	fprintf(stderr, "Opening %s, packing file(s)...\n", path);
 
 	FILE *fp = fopen(path, "wb");
 	if (!fp)
 	{
 		fprintf(stderr, "Could not open `%s`, exiting...\n", path);
-		return 1;
+		return -1;
 	}
 
 	int tmp, ofs = 0;
 	char filler = 0x3f;
-	char zero = 0;
 	fwrite(&tmp, 4, 1, fp);
 	fwrite(&tmp, 4, 1, fp);
 
 	ofs += 8;
 	for (int i = 0; i < files; i++)
 	{
-//      printf("%s\n", r[i].name);
 		fwrite(SIG_LINK, 16, 1, fp);
 		fwrite(&tmp, 4, 1, fp);
 		fwrite(&tmp, 4, 1, fp);
@@ -226,7 +271,6 @@ int pack(char *dir, char *fname)
 		char name[MAX_PATH];
 		fix_path(name, dir, r[i].name);
 
-//      printf("%s\n", name);
 		fwrite(name, strlen(name) + 1, 1, fp);
 
 		ofs += 16 + 4 * 2 + strlen(name) + 1;
@@ -258,8 +302,6 @@ int pack(char *dir, char *fname)
 
 		r[i].at = ofs - loc;
 		r[i].size = size;
-
-//      printf ("%d %d\n", r[i].at, r[i].size);
 
 		ofs += 64 + size;
 		while (ofs % 16 != 0)
@@ -294,8 +336,9 @@ int pack(char *dir, char *fname)
 		free(r[i].name);
 	}
 
-
 	fclose(fp);
+
+	fprintf(stderr, "Packed %d files.\n", files);
 
 	return 0;
 }
@@ -314,9 +357,12 @@ int main(int argc, char **argv)
 	char *from = argv[1];
 	char *to = argc > 2 ? argv[2] : 0;
 
-	struct _stat st;
-	if (_stat(from, &st) == -1)
-		return 1;
+	struct stat st;
+	if (stat(from, &st) == -1)
+	{
+		fprintf(stderr, "Path not found, exiting...\n");
+		return -1;
+	}
 
 	if ((st.st_mode & S_IFDIR) == S_IFDIR)
 		pack(from, to);
