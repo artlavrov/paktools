@@ -1,3 +1,5 @@
+#define VERSION "1.0.1"
+
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
 #include <windows.h>
@@ -374,7 +376,7 @@ int main(int argc, char **argv)
 
 	if (!from && !to)
 	{
-		printf("WayForward Engine resource packer (for Duck Tales Remastered, etc.) by artlavrov\n");
+		printf("WayForward Engine resource packer (for Duck Tales Remastered, etc.) ver. %s\n", VERSION);
 		printf("Usage:\n");
 		printf("	paktools [options] input.pak [output_dir]\n");
 		printf("	paktools [options] input_dir [output.pak]\n");
