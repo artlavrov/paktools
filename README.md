@@ -1,4 +1,4 @@
 paktools
 ========
 
-WayForward Engine resource packer
+WayForward Engine resource packer for https://github.com/artlavrov/adventuretime-rus
