@@ -15,8 +15,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#define SIG_LINK "FILELINK_____END"
-#define SIG_DATA "MANAGEDFILE_DATA BLOCK_USED_IN_ENGINE________________________END"
+static int PADDING = 8;
+
+#define SIG_LINK 0
+#define SIG_DATA 1
 
 #ifndef MAX_PATH
 #define MAX_PATH 4096
@@ -64,6 +66,22 @@ int write_to_file(char *path, char *data, int size)
 	return 0;
 }
 
+int make_sig(char * dest, int type, int align)
+{
+	char * sig[2][2] = {
+		{
+			"FILELINK",
+			"FILELINK_____END"
+		},
+		{
+			"MANAGEDFILE_DATABLOCK_USED_IN_ENGINE_END",
+			"MANAGEDFILE_DATABLOCK_USED_IN_ENGINE_________________________END"
+		}
+	};
+	strcpy (dest, sig[type][align==4?0:1]);
+	return strlen(dest);
+}
+
 int unpack(const char *fname, const char *dir)
 {
 	FILE *fp;
@@ -71,10 +89,7 @@ int unpack(const char *fname, const char *dir)
 
 	fp = fopen(fname, "rb");
 	if (!fp)
-	{
-		fprintf(stderr, "Could not open `%s`, exiting...\n", fname);
 		return -1;
-	}
 
 	fseek(fp, 0, SEEK_END);
 	size = ftell(fp);
@@ -97,12 +112,18 @@ int unpack(const char *fname, const char *dir)
 	{
 		fseek(fp, ofs, SEEK_SET);
 
-		char sig[16 + 1] = { 0 };
-		fread(sig, 16, 1, fp);	// 16 bytes for FILELINK_____END
+		char buf[256] = { 0 };
+		char sig[256];
 
-		if (memcmp(sig, SIG_LINK, 16) != 0)
+		int sig_len = make_sig (sig, SIG_LINK, PADDING);
+
+//		printf("%d %d %s\n", at, size, name);
+
+		fread(buf, sig_len, 1, fp);
+
+		// check if wrong signature
+		if (memcmp(buf, sig, sig_len) != 0)
 		{
-			fprintf(stderr, "Not a pak file, exiting...");
 			fclose(fp);
 			return -1;
 		}
@@ -114,16 +135,16 @@ int unpack(const char *fname, const char *dir)
 		fgets(name, MAX_PATH, fp);
 		int len = strlen(name);
 
-		at += loc + 64;			// 64 bytes for MANAGEDFILE_DATA BLOCK_USED_IN_ENGINE_________________________END
-
-		ofs += 16 + 4 * 2 + len + 1;
-		while (ofs % 8 != 0)
+		ofs += sig_len + 4*2 + len + 1;
+		while (ofs % PADDING != 0)
 			ofs++;
+
+		int sig_data_len = make_sig(sig, SIG_DATA, PADDING);
+		at += loc + sig_data_len;
 
 		char *data = (char *)malloc(size);
 		fseek(fp, at, SEEK_SET);
 		fread(data, size, 1, fp);
-
 
 		char *c = strchr(name, ':');
 		if (c)
@@ -250,11 +271,14 @@ int pack(char *dir, char *fname)
 	char filler = 0x3f;
 	fwrite(&tmp, 4, 1, fp);
 	fwrite(&tmp, 4, 1, fp);
-
+	int sig_len;
+	char sig[256];
 	ofs += 8;
 	for (int i = 0; i < files; i++)
 	{
-		fwrite(SIG_LINK, 16, 1, fp);
+		sig_len = make_sig(sig, SIG_LINK, PADDING);
+
+		fwrite(sig, sig_len, 1, fp);
 		fwrite(&tmp, 4, 1, fp);
 		fwrite(&tmp, 4, 1, fp);
 
@@ -263,13 +287,12 @@ int pack(char *dir, char *fname)
 
 		fwrite(name, strlen(name) + 1, 1, fp);
 
-		ofs += 16 + 4 * 2 + strlen(name) + 1;
-		while (ofs % 8 != 0)
+		ofs += sig_len + 4 * 2 + strlen(name) + 1;
+		while (ofs % PADDING != 0)
 			fwrite(&filler, 1, 1, fp), ofs++;
 	}
 
-	// fill to 16 bytes (why? idk)
-	while (ofs % 16 != 0)
+	while (ofs % (PADDING*2) != 0)
 		fwrite(&filler, 1, 1, fp), ofs++;
 
 	int loc = ofs;
@@ -286,19 +309,22 @@ int pack(char *dir, char *fname)
 		fclose(in);
 		// loaded
 
-		fwrite(SIG_DATA, 64, 1, fp);
+		char sig[256];
+		int sig_data_len = make_sig(sig, SIG_DATA, PADDING);
+
+		fwrite(sig, sig_data_len, 1, fp);
 		fwrite(data, size, 1, fp);
 		free(data);
 
 		r[i].at = ofs - loc;
 		r[i].size = size;
 
-		ofs += 64 + size;
-		while (ofs % 16 != 0)
+		ofs += sig_data_len + size;
+		while (ofs % PADDING != 0)
 			fwrite(&filler, 1, 1, fp), ofs++;
 	}
 
-	while (ofs % 32 != 0)
+	while (ofs % (PADDING*4) != 0)
 		fwrite(&filler, 1, 1, fp), ofs++;
 
 	// fixup offsets, etc.
@@ -310,7 +336,7 @@ int pack(char *dir, char *fname)
 
 	for (int i = 0; i < files; i++)
 	{
-		ofs += 16;
+		ofs += sig_len;
 		fseek(fp, ofs, SEEK_SET);
 
 		fwrite(&r[i].at, 4, 1, fp);
@@ -319,8 +345,8 @@ int pack(char *dir, char *fname)
 		char name[MAX_PATH];
 		fix_path(name, dir, r[i].name);
 
-		ofs += 4 * 2 + strlen(name) + 1;
-		while (ofs % 8 != 0)
+		ofs += 4*2 + strlen(name) + 1;
+		while (ofs % PADDING != 0)
 			ofs++;
 
 		free(r[i].name);
@@ -336,16 +362,28 @@ int pack(char *dir, char *fname)
 
 int main(int argc, char **argv)
 {
-	if (argc < 2)
+	char * from = 0;
+	char * to = 0;
+
+	int i = 1;
+
+	if (argc>i && !strcmp(argv[i],"-c"))
+		PADDING = 4, i++;
+	if (argc>i)
+		from = argv[i++];
+	if (argc>i)
+		to = argv[i++];
+
+	if (!from && !to)
 	{
 		printf("WayForward Engine resource packer (for Duck Tales Remastered, etc.) by artlavrov\n");
-		printf("Usage: paktools input.pak [output_dir]\n");
-		printf("       paktools input_dir [output.pak]\n");
+		printf("Usage:\n");
+		printf("	paktools [options] input.pak [output_dir]\n");
+		printf("	paktools [options] input_dir [output.pak]\n");
+		printf("Options:\n");
+		printf("	-c	compact (BloodRayne) allocation (could be autodetected)\n");
 		return 0;
 	}
-
-	char *from = argv[1];
-	char *to = argc > 2 ? argv[2] : 0;
 
 	struct stat st;
 	if (stat(from, &st) == -1)
@@ -354,10 +392,23 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	if ((st.st_mode & S_IFDIR) == S_IFDIR)
-		pack(from, to);
-	else
-		unpack(from, to);
+	int res = 0;
 
-	return 0;
+	if (((st.st_mode & S_IFDIR) == S_IFDIR))
+	{
+		res = pack(from, to);
+	} else
+	{
+		res = unpack(from, to);
+		if (res<0)
+		{
+			PADDING = 4;
+			res = unpack(from, to);
+		}
+	}
+
+	if (res<0)
+		fprintf(stderr, "Could not open file.");
+
+	return res;
 }
