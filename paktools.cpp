@@ -68,7 +68,7 @@ int write_to_file(char *path, char *data, int size)
 
 int make_sig(char * dest, int type, int align)
 {
-	char * sig[2][2] = {
+	const char * sig[2][2] = {
 		{
 			"FILELINK",
 			"FILELINK_____END"
@@ -116,8 +116,6 @@ int unpack(const char *fname, const char *dir)
 		char sig[256];
 
 		int sig_len = make_sig (sig, SIG_LINK, PADDING);
-
-//		printf("%d %d %s\n", at, size, name);
 
 		fread(buf, sig_len, 1, fp);
 
@@ -271,7 +269,7 @@ int pack(char *dir, char *fname)
 	char filler = 0x3f;
 	fwrite(&tmp, 4, 1, fp);
 	fwrite(&tmp, 4, 1, fp);
-	int sig_len;
+	int sig_len = 0;
 	char sig[256];
 	ofs += 8;
 	for (int i = 0; i < files; i++)
