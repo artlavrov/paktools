@@ -144,7 +144,7 @@ int unpack(const char *fname, const char *dir)
 
 	fclose(fp);
 
-	fprintf(stderr, "Extracted %d files.\n", files);
+	fprintf(stderr, "Extracted %d file(s).\n", files);
 
 	return 0;
 }
@@ -335,7 +335,7 @@ int pack(char *dir, char *fname)
 
 	fclose(fp);
 
-	fprintf(stderr, "Packed %d files.\n", files);
+	fprintf(stderr, "Packed %d file(s).\n", files);
 
 	return 0;
 }
