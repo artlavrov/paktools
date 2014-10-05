@@ -350,7 +350,7 @@ int main(int argc, char **argv)
 		printf("WayForward Engine resource packer (for Duck Tales Remastered, etc.) by artlavrov\n");
 		printf("Usage: paktools input.pak [output_dir]\n");
 		printf("       paktools input_dir [output.pak]\n");
-		return (0);
+		return 0;
 	}
 
 	char *from = argv[1];
