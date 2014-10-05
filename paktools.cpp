@@ -31,7 +31,7 @@ typedef struct {
 int write_to_file(char *path, char *data, int size)
 {
 	char *p = path;
-	char buf[MAX_PATH] = {0};
+	char buf[MAX_PATH] = { 0 };
 
 	while (1)
 	{
@@ -53,7 +53,7 @@ int write_to_file(char *path, char *data, int size)
 		p = c + 1;
 	}
 
-	strcat (buf, p);
+	strcat(buf, p);
 	FILE *fp = fopen(buf, "wb");
 	if (fp)
 	{
