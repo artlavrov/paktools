@@ -94,8 +94,6 @@ int unpack(const char *fname, const char *dir)
 	else
 		strcpy(outdir, dir);
 
-	fprintf(stderr, "Loaded %s, extracting files to %s...\n", fname, outdir);
-
 	ofs = 8;
 
 	for (int i = 0; i < files; i++)
@@ -144,7 +142,7 @@ int unpack(const char *fname, const char *dir)
 
 	fclose(fp);
 
-	fprintf(stderr, "Extracted %d file(s).\n", files);
+	fprintf(stderr, "Unpacked %d file(s) into %s\n", files, outdir);
 
 	return 0;
 }
@@ -244,8 +242,6 @@ int pack(char *dir, char *fname)
 	else
 		strcpy(path, fname);
 
-	fprintf(stderr, "Opening %s, packing file(s)...\n", path);
-
 	FILE *fp = fopen(path, "wb");
 	if (!fp)
 	{
@@ -335,7 +331,7 @@ int pack(char *dir, char *fname)
 
 	fclose(fp);
 
-	fprintf(stderr, "Packed %d file(s).\n", files);
+	fprintf(stderr, "Packed %d file(s) into %s\n", files, path);
 
 	return 0;
 }
