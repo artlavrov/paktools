@@ -1,21 +1,19 @@
-#include <stdio.h>
-#include <string.h>
-#include <malloc.h>
-
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
-#include <direct.h>
 #include <windows.h>
+#include <direct.h>
 #define mkdir _mkdir
 #define getcwd _getcwd
 #define chdir _chdir
-#define stat _stat
 #define strdup _strdup
 #else
 #include <unistd.h>
 #include <dirent.h>
 #endif
 
+#include <stdio.h>
+#include <string.h>
+#include <malloc.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
