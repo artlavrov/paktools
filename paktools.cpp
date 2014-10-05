@@ -3,8 +3,6 @@
 #include <windows.h>
 #include <direct.h>
 #define mkdir _mkdir
-#define getcwd _getcwd
-#define chdir _chdir
 #define strdup _strdup
 #else
 #include <unistd.h>
@@ -32,10 +30,9 @@ typedef struct {
 
 int write_to_file(char *path, char *data, int size)
 {
-	char cwd[MAX_PATH];
-	getcwd(cwd, sizeof(cwd));
-
 	char *p = path;
+	char buf[MAX_PATH] = {0};
+
 	while (1)
 	{
 		char *c = strchr(p, '/');
@@ -45,24 +42,24 @@ int write_to_file(char *path, char *data, int size)
 			break;
 		*c = 0;
 
-#ifdef _WIN32
-		mkdir(p);
-#else
-		mkdir(p, S_IRWXU | S_IRWXG | S_IRWXO);
-#endif
+		strcat(buf, p);
+		strcat(buf, "/");
 
-		chdir(p);
+#ifdef _WIN32
+		mkdir(buf);
+#else
+		mkdir(buf, S_IRWXU | S_IRWXG | S_IRWXO);
+#endif
 		p = c + 1;
 	}
 
-	FILE *fp = fopen(p, "wb");
+	strcat (buf, p);
+	FILE *fp = fopen(buf, "wb");
 	if (fp)
 	{
 		fwrite(data, size, 1, fp);
 		fclose(fp);
 	}
-
-	chdir(cwd);
 
 	return 0;
 }
