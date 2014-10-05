@@ -1,10 +1,9 @@
-#define _CRT_SECURE_NO_WARNINGS
-
 #include <stdio.h>
 #include <string.h>
 #include <malloc.h>
 
 #ifdef _WIN32
+#define _CRT_SECURE_NO_WARNINGS
 #include <direct.h>
 #include <windows.h>
 #define mkdir _mkdir
