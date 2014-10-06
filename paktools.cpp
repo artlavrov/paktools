@@ -1,4 +1,4 @@
-#define VERSION "1.0.1"
+#define VERSION "1.0.2"
 
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
@@ -18,6 +18,11 @@
 #include <sys/types.h>
 
 static int PADDING = 8;
+static int LIST_ONLY = 0;
+static int CLIP_PATH = 0;
+static char ** ARGV = 0;
+static int ARGC = 0;
+static int ARG0 = 0;
 
 #define SIG_LINK 0
 #define SIG_DATA 1
@@ -93,6 +98,8 @@ int unpack(const char *fname, const char *dir)
 	if (!fp)
 		return -1;
 
+	int unpacked = 0;
+
 	fseek(fp, 0, SEEK_END);
 	size = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
@@ -150,17 +157,54 @@ int unpack(const char *fname, const char *dir)
 		if (c)
 			*c = '/';
 
+		if (LIST_ONLY)
+			printf ("%10d %10d %s\n", at, size, name);
+
 		char path[MAX_PATH];
 		sprintf(path, "%s/%s", outdir, name);
 
-		write_to_file(path, data, size);
+		int filelist = ARG0<ARGC;
+
+		if (CLIP_PATH)
+		{
+			char * c = strrchr(name,'/');
+			if (!c)
+				c = strrchr(name,'\\');
+			if (c)
+				strcpy(path, c+1);
+		}
+
+		if (!LIST_ONLY)
+		{
+			if (filelist)
+			{
+				// filter out files
+				for (int j=ARG0; j<ARGC; j++)
+				{
+					char buf[MAX_PATH];
+					strcpy(buf, ARGV[j]);
+
+					// replace all backslashes (win32 issue)
+					for (char * c = buf; *c!=0; c++)
+						if (*c=='\\')
+							*c = '/';
+
+					//printf("checking %s against %s\n", buf, name);
+
+					if (!strcmp(buf, name))
+						write_to_file(path, data, size), unpacked++;
+				}
+			} else
+				write_to_file(path, data, size), unpacked++;
+		}
 
 		free(data);
 	}
 
 	fclose(fp);
 
-	fprintf(stderr, "Unpacked %d file(s) into %s\n", files, outdir);
+	if (!LIST_ONLY)
+		fprintf(stderr, "Unpacked %d file(s) into %s%s\n", unpacked, outdir, PADDING<8 ? " (compact allocation)" : "" );
 
 	return 0;
 }
@@ -365,23 +409,39 @@ int main(int argc, char **argv)
 	char * from = 0;
 	char * to = 0;
 
+//	for (int i=0; i<argc; i++) fprintf ( stdout, "argv[%d]='%s'\n", i, argv[i] );
+
 	int i = 1;
 
 	if (argc>i && !strcmp(argv[i],"-c"))
 		PADDING = 4, i++;
+
+	if (argc>i && !strcmp(argv[i],"-l"))
+		LIST_ONLY = 1, i++;
+
+	if (argc>i && !strcmp(argv[i],"-p"))
+		CLIP_PATH = 1, i++;
+
 	if (argc>i)
 		from = argv[i++];
+
 	if (argc>i)
 		to = argv[i++];
+
+	ARGC = argc;
+	ARGV = argv;
+	ARG0 = i;
 
 	if (!from && !to)
 	{
 		printf("WayForward Engine resource packer (for Duck Tales Remastered, etc.) ver. %s\n", VERSION);
-		printf("Usage:\n");
-		printf("	paktools [options] input.pak [output_dir]\n");
+		printf("\nUsage:\n");
+		printf("	paktools [options] input.pak [output_dir] [file1] [file2] ...\n");
 		printf("	paktools [options] input_dir [output.pak]\n");
-		printf("Options:\n");
+		printf("\nOptions:\n");
 		printf("	-c	compact (BloodRayne) allocation (could be autodetected)\n");
+		printf("	-l	list files without unpacking\n");
+		printf("	-p	extract without paths\n");
 		return 0;
 	}
 
@@ -397,6 +457,7 @@ int main(int argc, char **argv)
 	if (((st.st_mode & S_IFDIR) == S_IFDIR))
 	{
 		res = pack(from, to);
+
 	} else
 	{
 		res = unpack(from, to);
