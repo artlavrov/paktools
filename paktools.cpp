@@ -410,6 +410,7 @@ int main(int argc, char **argv)
 	char * to = 0;
 	ARGC = argc;
 	ARGV = argv;
+	ARG0 = 0;
 
 	for (int i=1;i<argc;i++)
 	{
@@ -423,7 +424,7 @@ int main(int argc, char **argv)
 			from = argv[i];
 		else if (!to)
 			to = argv[i];
-		else
+		else if (ARG0==0)
 			ARG0 = i;
 	}
 
