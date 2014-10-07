@@ -408,29 +408,24 @@ int main(int argc, char **argv)
 {
 	char * from = 0;
 	char * to = 0;
-
-//	for (int i=0; i<argc; i++) fprintf ( stdout, "argv[%d]='%s'\n", i, argv[i] );
-
-	int i = 1;
-
-	if (argc>i && !strcmp(argv[i],"-c"))
-		PADDING = 4, i++;
-
-	if (argc>i && !strcmp(argv[i],"-l"))
-		LIST_ONLY = 1, i++;
-
-	if (argc>i && !strcmp(argv[i],"-p"))
-		CLIP_PATH = 1, i++;
-
-	if (argc>i)
-		from = argv[i++];
-
-	if (argc>i)
-		to = argv[i++];
-
 	ARGC = argc;
 	ARGV = argv;
-	ARG0 = i;
+
+	for (int i=1;i<argc;i++)
+	{
+		if (!strcmp(argv[i],"-c"))
+			PADDING = 4;
+		else if (!strcmp(argv[i],"-l"))
+			LIST_ONLY = 1;
+		else if (!strcmp(argv[i],"-p"))
+			CLIP_PATH = 1;
+		else if (!from)
+			from = argv[i];
+		else if (!to)
+			to = argv[i];
+		else
+			ARG0 = i;
+	}
 
 	if (!from && !to)
 	{
