@@ -410,7 +410,6 @@ int main(int argc, char **argv)
 	char * to = 0;
 	ARGC = argc;
 	ARGV = argv;
-	ARG0 = 0;
 
 	for (int i=1;i<argc;i++)
 	{
@@ -428,7 +427,7 @@ int main(int argc, char **argv)
 			ARG0 = i;
 	}
 
-	if (!from && !to)
+	if (!from)
 	{
 		printf("WayForward Engine resource packer (for Duck Tales Remastered, etc.) ver. %s\n", VERSION);
 		printf("\nUsage:\n");
